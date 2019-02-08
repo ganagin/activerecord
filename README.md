@@ -47,14 +47,11 @@ static:
 
 ## query();
 
-	$result = $note->query('SELECT * FROM Note');
-	while ($note = $result->fetch_object('Note')) {
-		...
-	}
+	Note::query('...');
 
 ## escape()
 
-	$text = $note->escape($text);
+	$text = Note::escape($text);
 
 ## fields()
 
