@@ -17,13 +17,8 @@ static:
 
 ## set()
 
-	$data = [
-		'name' => 'Alex',
-		'message' => 'Hello',
-	];
-
 	$note = new Note();
-	$note->set($data); // Array or Object
+	$note->set($data); // $data -- Array or Object
 
 ## save()
 
