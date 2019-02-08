@@ -47,7 +47,9 @@ static:
 
 ## query();
 
-	Note::query('...');
+	if (Note::query('...')) {
+		...
+	}
 
 ## escape()
 
