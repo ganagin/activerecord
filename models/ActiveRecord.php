@@ -3,43 +3,74 @@
 abstract class ActiveRecord {
 
 	protected static $mysqli = false;
+	protected $id = null;
 
-	public function __construct($id = null)
+	public function __construct()
 	{
-		$table = static::table();
-		$fields = static::fields($table);
+		$fields = $this->fields();
 
 		foreach ($fields as $key=>$value) {
 			if (!isset($this->{$key})){
 				$this->{$key} = null;
 			}
 		}
+	}
 
-		if ($id) {
-			$this->read($id);
+	public static function objects($sql=false)
+	{
+		$table = get_called_class();
+		$records = [];
+
+		if (!$sql) {
+			$sql = 'SELECT * FROM ' . $table;
 		}
+
+		$result = self::$mysqli->query($sql);
+
+		while ($record = $result->fetch_object($table)) {
+			$id = $record->id;
+			$records[$id] = $record;
+		}
+
+		return $records;
+
+	}
+
+	public function fields()
+	{
+		$table = $this->table();
+		$sql = 'DESCRIBE `' . $table . '`';
+		$result = $this->query($sql);
+		$fields = [];
+
+		while ($record = $result->fetch_assoc()) {
+			$name = $record['Field'];
+			if ($name == 'id') {
+				continue;
+			}
+			$fields[$name] = $record;
+		}
+
+		return $fields;
 	}
 
 	public function set($data)
 	{
-		$table = static::table();
-		$fields = static::fields($table);
-
 		foreach ($data as $key=>$value) {
-			if (isset($fields[$key])) {
-				unset($this->{$key});
-				$this->{$key} = $value;
+			if ($key == 'id') {
+				continue;
 			}
+			unset($this->{$key});
+			$this->{$key} = $value;
 		}
 	}
 
 	public function save()
 	{
-		$table = static::table();
-		$fields = static::fields($table);
-		$primaryKey = static::primaryKey();
+		$table = $this->table();
+		$fields = $this->fields();
 
-		if (!empty($this->{$primaryKey})) {
+		if (!empty($this->id)) {
 
 			$sql[] = 'UPDATE';
 
@@ -49,23 +80,23 @@ abstract class ActiveRecord {
 
 		}
 
-		$sql[] = '`' . static::escape($table) . '` SET';
+		$sql[] = '`' . $this->escape($table) . '` SET';
 
 		foreach ($this as $key=>$value) {
 		
 			if (isset($fields[$key])) {
 
-				if ($key == $primaryKey) {
+				if ($key == 'id') {
 					continue;
 				}
 
 				if (empty($value)) {
 
-					$values[] = '`' . static::escape($key) . '` = NULL';
+					$values[] = '`' . $this->escape($key) . '` = NULL';
 
 				} else {
 				
-					$values[] = '`' . static::escape($key) . '` = "' . static::escape($value) . '"';
+					$values[] = '`' . $this->escape($key) . '` = "' . $this->escape($value) . '"';
 
 				}
 
@@ -79,42 +110,55 @@ abstract class ActiveRecord {
 		
 		$sql[] = implode(', ', $values);
 
-		if (!empty($this->{$primaryKey})) {
+		if (!empty($this->id)) {
 
-			$sql[] = 'WHERE `' . $primaryKey . '` = "' . static::escape($this->{$primaryKey}) . '"';
+			$sql[] = 'WHERE `id` = "' . $this->escape($this->id) . '"';
 
 		}
 
-		static::query(implode(' ', $sql));
+		$this->query(implode(' ', $sql));
 
-		if (empty($this->{$primaryKey})) {
+		if (empty($this->id)) {
 		
-			$this->{$primaryKey} = self::$mysqli->insert_id;
+			$this->id = self::$mysqli->insert_id;
 		
 		}
+
+		$this->read($this->id);
 
 		return true;
 
 	}
 
+	public function id()
+	{
+		return $this->id;
+	}
+
 	public function read(int $id)
 	{
-		$table = static::table();
-		$primaryKey = static::primaryKey();
-		$sql = 'SELECT * FROM `' . $table . '` WHERE `' . $primaryKey . '` = ' . $id;
-		$result = static::query($sql);
+		if (!preg_match('/^[1-9][0-9]*$/', $id)) {
+			throw new Exception('Wrong id format');
+		}
+
+		$table = $this->table();
+		$sql = 'SELECT * FROM `' . $table . '` WHERE `id` = ' . $id;
+		$result = $this->query($sql);
+		if ($result->num_rows == 0) {
+			throw new Exception("Record $id not found in table $table");
+		}
 		$record = $result->fetch_object($table);
 		$this->set($record);
+		$this->id = $record->id;
 	}
 
 	public function delete()
 	{
-		$table = static::table();
-		$primaryKey = static::primaryKey();
-		$id = $this->{$primaryKey};
+		$table = $this->table();
+		$id = $this->id;
 		if (!empty($id)) {
-			$sql = 'DELETE FROM `' . $table . '` WHERE `' . $primaryKey . '` = ' . $id;
-			static::query($sql);
+			$sql = 'DELETE FROM `' . $table . '` WHERE `id` = ' . $id;
+			$this->query($sql);
 		}
 	}
 
@@ -133,28 +177,7 @@ abstract class ActiveRecord {
 
 	}
 
-	public static function objects($sql=false)
-	{
-		$table = static::table();
-		$primaryKey = static::primaryKey();
-		$records = [];
-
-		if (!$sql) {
-			$sql = 'SELECT * FROM ' . $table;
-		}
-
-		$result = static::query($sql);
-
-		while ($record = $result->fetch_object($table)) {
-			$id = $record->{$primaryKey};
-			$records[$id] = $record;
-		}
-
-		return $records;
-
-	}
-
-	public static function query($sql)
+	public function query($sql)
 	{
 		$result = self::$mysqli->query($sql);
 
@@ -168,42 +191,16 @@ abstract class ActiveRecord {
 		return $result;
 	}
 
-	public static function escape($text)
+	public function escape($text)
 	{
 		$text = self::$mysqli->real_escape_string($text);
 		return $text;
 	}
 
-	public static function fields()
-	{
-		$table = static::table();
-		$sql = 'DESCRIBE `' . $table . '`';
-		$result = static::query($sql);
-		$fields = [];
-
-		while ($record = $result->fetch_assoc()) {
-			$name = $record['Field'];
-			$fields[$name] = $record;
-		}
-
-		return $fields;
-	}
-
-	public static function table()
+	public function table()
 	{
 		$table = get_called_class();
 		return $table;
-	}
-
-	public static function primaryKey()
-	{
-		$table = static::table();
-		$sql = 'SHOW KEYS FROM ' . $table . ' WHERE Key_name = "PRIMARY"';
-		$result = self::query($sql);
-		$record = $result->fetch_assoc();
-		$primaryKey = $record['Column_name'];
-
-		return $primaryKey;
 	}
 
 }

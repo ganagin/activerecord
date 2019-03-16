@@ -4,16 +4,16 @@
 - save()
 - read()
 - delete()
+- query()
+- escape()
+- fields()
+- table()
+- id()
 
 static:
 
 - config()
 - objects()
-- query()
-- escape()
-- fields()
-- table()
-- primaryKey()
 
 ## set()
 
@@ -32,6 +32,29 @@ static:
 
 	$note->delete();
 
+## query();
+
+	$result = $this->query(...);
+
+## escape()
+
+	$text = $this->escape($text);
+
+## fields()
+
+	$fields = $this->fields();
+
+## table()
+
+	$table = $this->table();
+
+## id()
+
+	$product = new Product();
+	$product->set(...);
+	$product->save();
+	$id = $product->id();
+
 ---------------------------------------------------------------------------------
 
 ## config()
@@ -44,26 +67,4 @@ static:
 	foreach ($notes as $note) {
 		...
 	}
-
-## query();
-
-	if (Note::query('...')) {
-		...
-	}
-
-## escape()
-
-	$text = Note::escape($text);
-
-## fields()
-
-	$fields = Note::fields();
-
-## table()
-
-	$table = Note::table();
-
-## primaryKey()
-
-	$primaryKey = Note::primaryKey();
 
